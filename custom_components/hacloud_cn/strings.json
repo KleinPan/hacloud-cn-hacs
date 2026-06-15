@@ -1,0 +1,28 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "HA Cloud CN",
+        "description": "Enter the backend URL and bind code to automatically configure the tunnel.",
+        "data": {
+          "backend_url": "Backend URL",
+          "bind_code": "Bind code"
+        }
+      },
+      "frpc": {
+        "title": "Tunnel Setup",
+        "description": "{frpc_hint}",
+        "data": {
+          "frpc_enabled": "Enable frpc auto management"
+        }
+      }
+    },
+    "error": {
+      "bind_failed": "Bind failed: please check whether the bind code is expired and the backend URL is reachable.",
+      "proxy_misconfigured": "Bind failed HTTP 405: reverse proxy misconfigured, /prod-api/* requests not forwarded to backend API. Check Caddy/Nginx config."
+    },
+    "abort": {
+      "already_configured": "This endpoint is already linked to this Home Assistant."
+    }
+  }
+}

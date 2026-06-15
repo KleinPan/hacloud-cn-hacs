@@ -1,0 +1,28 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "HA Cloud CN",
+        "description": "输入后端服务地址和接入码，即可自动完成绑定和隧道配置。",
+        "data": {
+          "backend_url": "后端服务地址",
+          "bind_code": "接入码"
+        }
+      },
+      "frpc": {
+        "title": "隧道配置",
+        "description": "{frpc_hint}",
+        "data": {
+          "frpc_enabled": "启用 frpc 自动管理"
+        }
+      }
+    },
+    "error": {
+      "bind_failed": "绑定失败：请检查接入码是否过期、后端地址是否可达。",
+      "proxy_misconfigured": "绑定失败 HTTP 405：反向代理未正确配置，/prod-api/* 请求未转发到后端 API，请检查 Caddy/Nginx 配置。"
+    },
+    "abort": {
+      "already_configured": "该终端已经接入过这台 Home Assistant。"
+    }
+  }
+}
