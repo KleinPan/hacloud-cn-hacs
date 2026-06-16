@@ -187,18 +187,21 @@ class HaCloudCoordinator(DataUpdateCoordinator[dict]):
         metrics = {}
         try:
             import psutil
+            psutil.cpu_percent(interval=0)
             metrics["cpuPercent"] = round(psutil.cpu_percent(interval=1), 1)
             mem = psutil.virtual_memory()
             metrics["memoryPercent"] = round(mem.percent, 1)
             disk = psutil.disk_usage("/")
             metrics["diskPercent"] = round(disk.percent, 1)
+        except ImportError:
+            _LOGGER.warning("psutil 未安装，健康指标采集不可用。请确认集成版本已更新并重启 Home Assistant")
         except Exception as err:
-            _LOGGER.debug("psutil 采集失败: %s", err)
+            _LOGGER.warning("psutil 采集失败（Container 环境可能受限）: %s", err)
         return metrics
 
     async def _async_update_data(self) -> dict:
         health = await self.hass.async_add_executor_job(self._collect_health_metrics)
-        if health and self._system_info:
+        if health:
             self._system_info.update(health)
 
         try:
