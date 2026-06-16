@@ -183,8 +183,24 @@ class HaCloudCoordinator(DataUpdateCoordinator[dict]):
         self._frpc_manager = frpc_manager
         self._system_info = system_info or {}
 
+    def _collect_health_metrics(self) -> dict:
+        metrics = {}
+        try:
+            import psutil
+            metrics["cpuPercent"] = round(psutil.cpu_percent(interval=1), 1)
+            mem = psutil.virtual_memory()
+            metrics["memoryPercent"] = round(mem.percent, 1)
+            disk = psutil.disk_usage("/")
+            metrics["diskPercent"] = round(disk.percent, 1)
+        except Exception as err:
+            _LOGGER.debug("psutil 采集失败: %s", err)
+        return metrics
+
     async def _async_update_data(self) -> dict:
-        """周期拉取：先 heartbeat 上报在线，再拉订阅 + 流量摘要，最后确保 frpc 存活。"""
+        health = await self.hass.async_add_executor_job(self._collect_health_metrics)
+        if health and self._system_info:
+            self._system_info.update(health)
+
         try:
             await self.client.heartbeat(self._system_info)
         except Exception as err:  # noqa: BLE001
