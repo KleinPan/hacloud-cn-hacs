@@ -1,7 +1,7 @@
 {
   "domain": "hacloud_cn",
   "name": "HA Cloud CN",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "documentation": "https://github.com/KleinPan/hacloud-cn-hacs/blob/main/README.md",
   "issue_tracker": "https://github.com/KleinPan/hacloud-cn-hacs/issues",
   "codeowners": ["@KleinPan"],

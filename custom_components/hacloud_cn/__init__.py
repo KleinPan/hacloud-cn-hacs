@@ -29,6 +29,7 @@ from .const import (
     CONF_SUBDOMAIN,
     CONF_TOKEN,
     DOMAIN,
+    FRPC_LOG_FILENAME,
     FRPC_VERSION,
     INTEGRATION_VERSION,
     UPDATE_INTERVAL_SECONDS,
@@ -36,6 +37,7 @@ from .const import (
 from .frpc_manager import (
     FrpcManager,
     download_and_install_frpc,
+    frpc_log_path,
     generate_frpc_config,
     resolve_frpc_binary,
     write_frpc_config,
@@ -73,17 +75,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "如果您的集成配置是在早期版本创建的，请删除并重新添加集成以获取 frps_auth_token"
             )
         else:
-            _LOGGER.info(
-                "config entry 中 frps_auth_token: len=%d raw=%r hex=%s",
-                len(frps_auth_token),
-                frps_auth_token,
-                ' '.join(f'{b:02x}' for b in frps_auth_token.encode('utf-8')),
-            )
+            _LOGGER.info("config entry 中 frps_auth_token: len=%d", len(frps_auth_token))
 
         if frps_addr and token and subdomain and frp_port:
             config_content = generate_frpc_config(
                 frps_addr, token, subdomain, frp_port,
                 frps_auth_token=frps_auth_token,
+                log_path=frpc_log_path(hass),
             )
             await write_frpc_config(hass, config_content)
 
@@ -204,13 +202,31 @@ class HaCloudCoordinator(DataUpdateCoordinator[dict]):
         if health:
             self._system_info.update(health)
 
+        # online 以 heartbeat 真实结果为准，不再硬编码 True；
+        # token 失效（401）时在实体上直接暴露"认证失效"，避免静默假在线
+        heartbeat_ok = False
+        last_error = None
         try:
-            await self.client.heartbeat(self._system_info)
+            result = await self.client.heartbeat(self._system_info)
+            heartbeat_ok = bool(result)
         except Exception as err:  # noqa: BLE001
-            _LOGGER.warning("Heartbeat failed: %s", err)
+            last_error = str(err)
+            level = _LOGGER.error if "token invalid" in last_error else _LOGGER.warning
+            level("Heartbeat failed: %s", err)
 
-        subscription = await self.client.get_current_subscription()
-        traffic = await self.client.get_traffic_summary()
+        subscription = None
+        try:
+            subscription = await self.client.get_current_subscription()
+        except Exception as err:  # noqa: BLE001
+            last_error = last_error or str(err)
+            _LOGGER.warning("查询订阅失败: %s", err)
+
+        traffic = None
+        try:
+            traffic = await self.client.get_traffic_summary()
+        except Exception as err:  # noqa: BLE001
+            last_error = last_error or str(err)
+            _LOGGER.warning("查询流量失败: %s", err)
 
         if traffic:
             for key in ("totalBytesMonth", "upBytesMonth", "downBytesMonth"):
@@ -235,7 +251,8 @@ class HaCloudCoordinator(DataUpdateCoordinator[dict]):
             await self._frpc_manager.ensure_running()
 
         return {
-            "online": True,
+            "online": heartbeat_ok,
+            "last_error": last_error,
             "subscription": subscription,
             "traffic": traffic,
             "frpc_status": frpc_status,

@@ -68,6 +68,11 @@ def _log_path(hass: HomeAssistant) -> Path:
     return _config_dir(hass) / FRPC_LOG_FILENAME
 
 
+def frpc_log_path(hass: HomeAssistant) -> str:
+    """frpc 日志文件绝对路径（写入 frpc.toml [log].to）。"""
+    return str(_log_path(hass))
+
+
 def _frpc_binary_path(hass: HomeAssistant) -> Path:
     return _config_dir(hass) / FRPC_BINARY_NAME
 
@@ -87,11 +92,6 @@ def resolve_frpc_binary(hass: HomeAssistant) -> str | None:
     return find_local_frpc(hass) or find_system_frpc()
 
 
-def _hex_dump(s: str) -> str:
-    """Return hex dump of a string's UTF-8 bytes for audit."""
-    return ' '.join(f'{b:02x}' for b in s.encode('utf-8'))
-
-
 def generate_frpc_config(
     frps_addr: str,
     token: str,
@@ -99,17 +99,13 @@ def generate_frpc_config(
     frp_port: int,
     ha_port: int = 8123,
     frps_auth_token: str = "",
+    log_path: str = "",
 ) -> str:
     host, _, port_str = frps_addr.partition(":")
     port = int(port_str) if port_str else 7000
     auth_section = ""
     if frps_auth_token:
-        _LOGGER.info(
-            "frpc auth.token 写入: len=%d raw=%r hex=%s",
-            len(frps_auth_token),
-            frps_auth_token,
-            _hex_dump(frps_auth_token),
-        )
+        _LOGGER.info("frpc auth.token 写入: len=%d", len(frps_auth_token))
         auth_section = f"""
 [auth]
 method = "token"
@@ -117,12 +113,7 @@ token = "{frps_auth_token}"
 """
     else:
         _LOGGER.warning("frpc auth.token 为空！frps 可能已启用 auth.token 要求，frpc 将无法通过认证")
-    _LOGGER.info(
-        "frpc metadatas.token 写入: len=%d raw=%r hex=%s",
-        len(token),
-        token,
-        _hex_dump(token),
-    )
+    _LOGGER.info("frpc metadatas.token 写入: len=%d", len(token))
     return f"""serverAddr = "{host}"
 serverPort = {port}
 loginFailExit = false
@@ -145,7 +136,7 @@ heartbeatTimeout = 60
 enable = false
 
 [log]
-to = ""
+to = "{log_path}"
 level = "info"
 maxDays = 7
 """

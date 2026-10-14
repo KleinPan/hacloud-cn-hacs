@@ -125,6 +125,8 @@ class HaCloudApiClient:
                 if resp.status >= 500:
                     raise HaCloudApiError(f"server error {resp.status}")
                 data = await resp.json()
+                if resp.status == 401 or data.get("code") == 401:
+                    raise HaCloudApiError("endpoint token invalid (401)")
                 return data.get("data") or {}
         except aiohttp.ClientError as err:
             raise HaCloudApiError(str(err)) from err
@@ -138,6 +140,8 @@ class HaCloudApiClient:
                 if resp.status >= 500:
                     raise HaCloudApiError(f"server error {resp.status}")
                 data = await resp.json()
+                if resp.status == 401 or data.get("code") == 401:
+                    raise HaCloudApiError("endpoint token invalid (401)")
                 return data.get("data") or {}
         except aiohttp.ClientError as err:
             raise HaCloudApiError(str(err)) from err

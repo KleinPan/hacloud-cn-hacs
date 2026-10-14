@@ -71,7 +71,20 @@ class HaCloudOnlineSensor(_BaseSensor):
 
     @property
     def native_value(self) -> str:
-        return "在线" if self.coordinator.data.get("online") else "离线"
+        if self.coordinator.data.get("online"):
+            return "在线"
+        last_error = str(self.coordinator.data.get("last_error") or "")
+        if "token invalid" in last_error:
+            return "认证失效"
+        return "离线"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        attrs = {}
+        last_error = self.coordinator.data.get("last_error")
+        if last_error:
+            attrs["last_error"] = last_error
+        return attrs
 
 
 class HaCloudTrafficMonthSensor(_BaseSensor):
