@@ -8,6 +8,7 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory, UnitOfInformation
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -27,6 +28,17 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+def build_device_info(endpoint_id: int, subdomain: str, full_domain: str) -> DeviceInfo:
+    """构造终端虚拟设备 — 所有实体挂到同一设备下，避免成为无设备孤立实体。"""
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"hacloud_cn_{endpoint_id}")},
+        name=f"HA Cloud · {full_domain}",
+        manufacturer="HA Cloud CN",
+        model="云端隧道终端",
+        configuration_url=f"https://{full_domain}",
+    )
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -40,13 +52,14 @@ async def async_setup_entry(
     full_domain = entry.data.get(CONF_FULL_DOMAIN) or f"{subdomain}.hacloud.asia"
     frps_addr = entry.data.get(CONF_FRPS_ADDR)
     frp_port = entry.data.get(CONF_FRP_PORT)
+    device_info = build_device_info(endpoint_id, subdomain, full_domain)
     async_add_entities(
         [
-            HaCloudOnlineSensor(coordinator, endpoint_id, subdomain),
-            HaCloudTrafficMonthSensor(coordinator, endpoint_id, subdomain),
-            HaCloudSubscriptionExpiresSensor(coordinator, endpoint_id, subdomain),
-            HaCloudDomainInfoSensor(coordinator, endpoint_id, subdomain, full_domain, frps_addr, frp_port),
-            HaCloudFrpcStatusSensor(coordinator, endpoint_id, subdomain),
+            HaCloudOnlineSensor(coordinator, endpoint_id, subdomain, device_info),
+            HaCloudTrafficMonthSensor(coordinator, endpoint_id, subdomain, device_info),
+            HaCloudSubscriptionExpiresSensor(coordinator, endpoint_id, subdomain, device_info),
+            HaCloudDomainInfoSensor(coordinator, endpoint_id, subdomain, full_domain, frps_addr, frp_port, device_info),
+            HaCloudFrpcStatusSensor(coordinator, endpoint_id, subdomain, device_info),
         ]
     )
 
@@ -54,20 +67,22 @@ async def async_setup_entry(
 class _BaseSensor(CoordinatorEntity, SensorEntity):
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator, endpoint_id: int, subdomain: str, key: str, name: str) -> None:
+    def __init__(self, coordinator, endpoint_id: int, subdomain: str, key: str, name: str, device_info: DeviceInfo = None) -> None:
         super().__init__(coordinator)
         self._endpoint_id = endpoint_id
         self._subdomain = subdomain
         self._attr_unique_id = f"hacloud_cn_{endpoint_id}_{key}"
         self._attr_name = name
+        if device_info is not None:
+            self._attr_device_info = device_info
 
 
 class HaCloudOnlineSensor(_BaseSensor):
     _attr_icon = "mdi:cloud-check-outline"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
-    def __init__(self, coordinator, endpoint_id: int, subdomain: str) -> None:
-        super().__init__(coordinator, endpoint_id, subdomain, SENSOR_ONLINE, "在线状态")
+    def __init__(self, coordinator, endpoint_id: int, subdomain: str, device_info: DeviceInfo = None) -> None:
+        super().__init__(coordinator, endpoint_id, subdomain, SENSOR_ONLINE, "在线状态", device_info)
 
     @property
     def native_value(self) -> str:
@@ -92,8 +107,8 @@ class HaCloudTrafficMonthSensor(_BaseSensor):
     _attr_native_unit_of_measurement = UnitOfInformation.MEGABYTES
     _attr_suggested_display_precision = 2
 
-    def __init__(self, coordinator, endpoint_id: int, subdomain: str) -> None:
-        super().__init__(coordinator, endpoint_id, subdomain, SENSOR_TRAFFIC_MONTH_MB, "本月流量")
+    def __init__(self, coordinator, endpoint_id: int, subdomain: str, device_info: DeviceInfo = None) -> None:
+        super().__init__(coordinator, endpoint_id, subdomain, SENSOR_TRAFFIC_MONTH_MB, "本月流量", device_info)
 
     @property
     def native_value(self) -> float | None:
@@ -114,8 +129,8 @@ class HaCloudTrafficMonthSensor(_BaseSensor):
 class HaCloudSubscriptionExpiresSensor(_BaseSensor):
     _attr_icon = "mdi:calendar-end"
 
-    def __init__(self, coordinator, endpoint_id: int, subdomain: str) -> None:
-        super().__init__(coordinator, endpoint_id, subdomain, SENSOR_SUBSCRIPTION_EXPIRES, "订阅到期")
+    def __init__(self, coordinator, endpoint_id: int, subdomain: str, device_info: DeviceInfo = None) -> None:
+        super().__init__(coordinator, endpoint_id, subdomain, SENSOR_SUBSCRIPTION_EXPIRES, "订阅到期", device_info)
 
     @property
     def native_value(self) -> str | None:
@@ -141,8 +156,9 @@ class HaCloudDomainInfoSensor(_BaseSensor):
         full_domain: str,
         frps_addr: str | None,
         frp_port: int | None,
+        device_info: DeviceInfo = None,
     ) -> None:
-        super().__init__(coordinator, endpoint_id, subdomain, "domain_info", "域名信息")
+        super().__init__(coordinator, endpoint_id, subdomain, "domain_info", "域名信息", device_info)
         self._full_domain = full_domain
         self._frps_addr = frps_addr
         self._frp_port = frp_port
@@ -168,8 +184,8 @@ class HaCloudFrpcStatusSensor(_BaseSensor):
     _attr_icon = "mdi:tunnel"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
-    def __init__(self, coordinator, endpoint_id: int, subdomain: str) -> None:
-        super().__init__(coordinator, endpoint_id, subdomain, "frpc_status", "隧道状态")
+    def __init__(self, coordinator, endpoint_id: int, subdomain: str, device_info: DeviceInfo = None) -> None:
+        super().__init__(coordinator, endpoint_id, subdomain, "frpc_status", "隧道状态", device_info)
 
     @property
     def native_value(self) -> str:

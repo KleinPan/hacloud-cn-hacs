@@ -16,10 +16,12 @@ import logging
 from homeassistant.components.notify import NotifyEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .api import HaCloudApiClient
-from .const import DOMAIN
+from .const import CONF_ENDPOINT_ID, CONF_FULL_DOMAIN, CONF_SUBDOMAIN, DOMAIN
+from .sensor import build_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,16 +33,21 @@ async def async_setup_entry(
 ) -> None:
     entry_data = hass.data[DOMAIN][entry.entry_id]
     client: HaCloudApiClient = entry_data["client"]
-    async_add_entities([HaCloudNotifyEntity(client)])
+    endpoint_id = entry.data[CONF_ENDPOINT_ID]
+    subdomain = entry.data.get(CONF_SUBDOMAIN) or str(endpoint_id)
+    full_domain = entry.data.get(CONF_FULL_DOMAIN) or f"{subdomain}.hacloud.asia"
+    async_add_entities([HaCloudNotifyEntity(client, build_device_info(endpoint_id, subdomain, full_domain))])
 
 
 class HaCloudNotifyEntity(NotifyEntity):
     """HA Cloud CN 通知服务 — 将 HA 告警转发到云端用户配置的通知渠道。"""
 
     _attr_name = "HA Cloud"
+    _attr_has_entity_name = True
 
-    def __init__(self, client: HaCloudApiClient) -> None:
+    def __init__(self, client: HaCloudApiClient, device_info: DeviceInfo) -> None:
         self._client = client
+        self._attr_device_info = device_info
 
     async def async_send_message(self, message: str, title: str | None = None) -> None:
         try:
